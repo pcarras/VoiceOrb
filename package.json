@@ -1,6 +1,6 @@
 {
   "name": "orb",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Voice Orb AI",
   "main": "main.js",
   "scripts": {

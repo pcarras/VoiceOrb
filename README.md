@@ -6,7 +6,7 @@
 
 **A beautiful, voice-reactive AI orb for Windows that lives on your desktop.**
 
-[![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](https://github.com/pcarras/VoiceOrb/releases)
+[![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)](https://github.com/pcarras/VoiceOrb/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -95,8 +95,8 @@ Voice Orb includes **5 stunning visual presets**:
 | Preset | Description |
 |--------|-------------|
 | 🌌 Deep Void | Dark, ethereal sphere with subtle glow |
+| ☢️ Toxic Spikes | Green radioactive sphere that explodes into spikes |
 | 🔵 Classic Siri | Minimalist sphere with pulsing emissions |
-| ☢️ Toxic Sludge | Green, bubbling radioactive surface |
 | 🔷 Geometric Low-Poly | Sharp, angular aesthetic with wireframe effects |
 | ⚙️ Rusty Machine | Steampunk-style wireframe torus knot |
 

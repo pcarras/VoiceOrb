@@ -907,7 +907,95 @@
                     scene.background = oldBg;
                 }
             },
-            // 1. Classic Siri (was 0)
+            // 1. Toxic Spikes (was 2) - UPDATED
+            {
+                setup: () => {
+                    // Lower detail (3) for performance and sharper spikes
+                    const geo = new THREE.IcosahedronGeometry(2, 3);
+                    const pos = geo.attributes.position;
+
+                    // Store original positions for reference
+                    const originals = new Float32Array(pos.count * 3);
+                    const spikeFactors = new Float32Array(pos.count);
+
+                    for (let i = 0; i < pos.count; i++) {
+                        originals[i * 3] = pos.array[i * 3];
+                        originals[i * 3 + 1] = pos.array[i * 3 + 1];
+                        originals[i * 3 + 2] = pos.array[i * 3 + 2];
+                        // Random factor: determine which vertices can become spikes
+                        spikeFactors[i] = Math.random();
+                    }
+                    geo.userData = { originals, spikeFactors };
+
+                    const mat = new THREE.MeshPhongMaterial({
+                        color: 0x00ff00, shininess: 30, flatShading: true
+                    });
+
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.userData.smoothedVol = 0; // Init smoothing variable
+                    return mesh;
+                },
+                update: (mesh, data) => {
+                    // Smooth transition for recording state (slower: 0.05)
+                    const targetRecording = isRecordingVisual ? 1.0 : 0.0;
+                    recordingTransition += (targetRecording - recordingTransition) * 0.05;
+
+                    // RECORDING EFFECT: Color turns RADIOACTIVE ORANGE
+                    const idleColor = new THREE.Color(0x00ff00);
+                    const recordingColor = new THREE.Color(0xff6600);
+                    mesh.material.color.lerpColors(idleColor, recordingColor, recordingTransition);
+
+                    // Rotation
+                    mesh.rotation.y += 0.02;
+                    mesh.rotation.z = Math.sin(time * 0.5) * 0.2;
+
+                    // Vertex Explosion Logic
+                    const pos = mesh.geometry.attributes.position;
+                    const { originals, spikeFactors } = mesh.geometry.userData;
+                    const count = pos.count;
+
+                    // SMOOTHING and REDUCED SENSITIVITY
+                    // Target is simpler raw data, let LERP handle smoothness
+                    const targetVol = data.avg * 1.5; // Reduced from 2.0
+                    mesh.userData.smoothedVol += (targetVol - mesh.userData.smoothedVol) * 0.1; // Smooth factor
+                    const volume = mesh.userData.smoothedVol;
+
+                    const bass = data.bass;
+
+                    for (let i = 0; i < count; i++) {
+                        const spikePotential = spikeFactors[i];
+                        let scale = 1.0;
+
+                        // Base breathing (slower/smoother)
+                        scale += Math.sin(time * 2 + i) * 0.02;
+
+                        // EXPLOSION: driven by SMOOTHED volume
+                        if (spikePotential > 0.5) {
+                            if (volume > 0.05) {
+                                // Reduced multiplier slightly
+                                scale += volume * (spikePotential * 2.2);
+                            }
+                        } else {
+                            // Non-spikes
+                            scale += bass * 0.15;
+                        }
+
+                        // Jitter only if really loud or recording
+                        if (isRecordingVisual) {
+                            scale += (Math.random() - 0.5) * 0.1;
+                        }
+
+                        pos.setX(i, originals[i * 3] * scale);
+                        pos.setY(i, originals[i * 3 + 1] * scale);
+                        pos.setZ(i, originals[i * 3 + 2] * scale);
+                    }
+
+                    pos.needsUpdate = true;
+                    // Compute normals less frequently? No, needs 60fps for light to look right
+                    mesh.geometry.computeVertexNormals();
+                }
+            },
+            // 2. Classic Siri (was 1)
             {
                 setup: () => {
                     const mat = new THREE.MeshPhongMaterial({
@@ -921,38 +1009,16 @@
                     const targetRecording = isRecordingVisual ? 1.0 : 0.0;
                     recordingTransition += (targetRecording - recordingTransition) * 0.1;
 
-                    mesh.scale.setScalar(1 + data.bass * 0.4);
-                    mesh.rotation.y += 0.01 + recordingTransition * 0.05; // FASTER rotation when recording
-
                     // RECORDING EFFECT: Color shifts to RED-ORANGE, pulses faster
                     const idleColor = new THREE.Color(0x0088ff);
                     const recordingColor = new THREE.Color(0xff4400);
                     mesh.material.emissive.lerpColors(idleColor, recordingColor, recordingTransition);
 
+                    mesh.scale.setScalar(1 + data.bass * 0.4);
+                    mesh.rotation.y += 0.01 + recordingTransition * 0.05; // FASTER rotation when recording
+
                     const baseIntensity = 0.5 + data.high * 2;
                     mesh.material.emissiveIntensity = baseIntensity + recordingTransition * 2.0;
-                }
-            },
-            // 2. Toxic Sludge (was 5)
-            {
-                setup: () => {
-                    const mat = new THREE.MeshPhongMaterial({
-                        color: 0x00ff00, shininess: 30, flatShading: true
-                    });
-                    return new THREE.Mesh(new THREE.IcosahedronGeometry(2, 5), mat);
-                },
-                update: (mesh, data) => {
-                    // Smooth transition for recording state
-                    const targetRecording = isRecordingVisual ? 1.0 : 0.0;
-                    recordingTransition += (targetRecording - recordingTransition) * 0.1;
-
-                    // RECORDING EFFECT: Bubbles ACCELERATE, turn RADIOACTIVE ORANGE
-                    mesh.rotation.y += 0.01 + recordingTransition * 0.08;
-                    mesh.scale.setScalar(1 + data.bass * 0.3 + Math.sin(time * (5 + recordingTransition * 10)) * 0.1);
-
-                    const idleColor = new THREE.Color(0x00ff00);
-                    const recordingColor = new THREE.Color(0xff6600);
-                    mesh.material.color.lerpColors(idleColor, recordingColor, recordingTransition);
                 }
             },
             // 3. Geometric Low-Poly (was 13)
