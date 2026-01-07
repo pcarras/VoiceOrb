@@ -19,7 +19,7 @@
 - 🎤 **Voice-Reactive Visualization** — The orb responds in real-time to your microphone input with stunning 3D animations
 - 🎙️ **Voice-to-Text Transcription** — Hold a hotkey to record, release to transcribe using Groq's Whisper API
 - 📋 **Auto-Paste** — Transcribed text is automatically pasted at your cursor position
-- 🎨 **Multiple Visual Presets** — Choose from 20 unique orb styles (Deep Void, Neon Pulse, Plasma Core, and more)
+- 🎨 **visual Presets** — Choose from 5 unique orb styles (Deep Void, Classic Siri, Toxic Sludge, etc.)
 - ⚙️ **Fully Customizable** — Adjust size, opacity, shadow intensity, and visual effects
 - 🖥️ **Desktop Overlay** — Transparent, always-on-top window that sits on your desktop
 - 🎵 **Sound Effects** — Satisfying audio feedback for entry/exit animations
@@ -69,7 +69,7 @@ npm run dist
 | **Shadow Opacity** | Intensity of the shadow beneath the orb | 0.4 |
 | **Overlay Opacity** | Transparency of the transcription text | 0.4 |
 | **Show Transcription** | Display transcribed text on screen | Off |
-| **Visual Preset** | Choose from 20 unique orb styles | Deep Void |
+| **Visual Preset** | Choose from 5 unique orb styles | Deep Void |
 | **Shortcut** | Hotkey to start recording | AltGr |
 
 ---
@@ -90,16 +90,15 @@ npm run dist
 
 ## 🎨 Visual Presets
 
-Voice Orb includes **20 stunning visual presets**:
+Voice Orb includes **5 stunning visual presets**:
 
 | Preset | Description |
 |--------|-------------|
 | 🌌 Deep Void | Dark, ethereal sphere with subtle glow |
-| 💜 Neon Pulse | Vibrant wireframe with neon colors |
-| 🔥 Plasma Core | Fiery energy core effect |
-| 🌊 Ocean Dream | Flowing water-like surface |
-| ⚡ Electric Storm | Lightning and electrical effects |
-| ... and 15 more! | |
+| 🔵 Classic Siri | Minimalist sphere with pulsing emissions |
+| ☢️ Toxic Sludge | Green, bubbling radioactive surface |
+| 🔷 Geometric Low-Poly | Sharp, angular aesthetic with wireframe effects |
+| ⚙️ Rusty Machine | Steampunk-style wireframe torus knot |
 
 ---
 
@@ -122,8 +121,7 @@ orb/
 ├── settings.js          # Settings logic
 ├── about.html           # About window
 ├── icon.png             # App icon
-├── assets/              # Images and resources
-└── dist/                # Built installers
+└── assets/              # Images and resources
 ```
 
 ---
