@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Voice Orb Preview](assets/preview.png)
+![Voice Orb Preview](assets/preview-v104.png)
 
 **A beautiful, voice-reactive AI orb for Windows that lives on your desktop.**
 
