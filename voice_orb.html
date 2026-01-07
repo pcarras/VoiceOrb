@@ -957,7 +957,7 @@
                     // SMOOTHING and REDUCED SENSITIVITY
                     // Target is simpler raw data, let LERP handle smoothness
                     const targetVol = data.avg * 1.5; // Reduced from 2.0
-                    mesh.userData.smoothedVol += (targetVol - mesh.userData.smoothedVol) * 0.1; // Smooth factor
+                    mesh.userData.smoothedVol += (targetVol - mesh.userData.smoothedVol) * 0.05; // Smooth factor (0.05)
                     const volume = mesh.userData.smoothedVol;
 
                     const bass = data.bass;
