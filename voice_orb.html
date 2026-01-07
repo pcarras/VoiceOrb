@@ -504,6 +504,29 @@
                 document.body.classList.add('hidden');
             });
 
+            // Handle App Exit Animation
+            ipcRenderer.on('exit-app', async () => {
+                console.log("[DEBUG] exit-app received");
+
+                // Re-enable animation smoothing for exit
+                hasCompletedEntryAnimation = false;
+
+                // Animate out
+                targetDisplayScale = 0.0;
+                targetOrbOpacity = 0.0;
+
+                // Play exit sound
+                if (audioContext && audioContext.state === 'running') {
+                    playTone(300, 'sine', 0.1);
+                    setTimeout(() => playTone(200, 'sine', 0.2), 100);
+                }
+
+                // Wait for animation then tell main to quit
+                setTimeout(() => {
+                    ipcRenderer.send('app-exit-finished'); // Not currently handled in main, but good practice
+                }, 800);
+            });
+
             // When settings window opens, ensure scale is synced to prevent animation
             ipcRenderer.on('settings-opened', () => {
                 console.log("[DEBUG] settings-opened received - syncing scale");

@@ -6,7 +6,7 @@
 
 **A beautiful, voice-reactive AI orb for Windows that lives on your desktop.**
 
-[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/pcarras/VoiceOrb/releases)
+[![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](https://github.com/pcarras/VoiceOrb/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
