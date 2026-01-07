@@ -1,0 +1,21 @@
+{
+    "api_keys": {
+        "groq": ""
+    },
+    "window": {
+        "x": 1500,
+        "y": 800
+    },
+    "orb_scale": 0.4,
+    "shortcut": [
+        3640
+    ],
+    "record_key": "alt gr",
+    "model": "whisper-large-v3-turbo",
+    "language": "pt",
+    "selected_platform": "groq",
+    "overlay_opacity": 0.6,
+    "show_overlay": false,
+    "preset": 0,
+    "orb_opacity": 1
+}

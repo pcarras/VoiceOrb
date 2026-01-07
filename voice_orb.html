@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>20 Voice-Reactive AI Orbs</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: transparent;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            opacity: 1;
+            /* Start visible to confirm it's working */
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        body.hidden {
+            opacity: 0;
+        }
+
+        #orb-shadow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 65%;
+            height: 65%;
+            background: radial-gradient(circle, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.1) 40%, rgba(0, 0, 0, 0) 80%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+            transition: opacity 0.3s ease;
+        }
+
+        /* ... rest of styles ... */
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            background: transparent;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+            display: none;
+            /* Hidden by default, shown on Right Click */
+        }
+
+        #fps-counter {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        p {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 15px;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            background: #222;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select:hover {
+            border-color: #666;
+        }
+
+        button {
+            margin-top: 15px;
+            width: 100%;
+            padding: 10px;
+            background: #0070f3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #0051b3;
+        }
+
+        button.active {
+            background: #e00;
+        }
+
+        #visualizer-status {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #0f0;
+            display: none;
+        }
+    </style>
+    <style>
+        /* ... existing styles ... */
+        .draggable {
+            -webkit-app-region: drag;
+            cursor: move;
+        }
+
+        .non-draggable {
+            -webkit-app-region: no-drag;
+            cursor: default;
+        }
+
+        #settings-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        #settings-btn:hover {
+            color: white;
+        }
+
+        #settings-modal {
+            display: none;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .setting-row {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        input[type="range"] {
+            width: 100px;
+        }
+
+        /* Make the main UI layer draggable, but inputs clickable */
+        #ui-layer {
+            /* ... existing ... */
+            -webkit-app-region: drag;
+        }
+
+        select,
+        button,
+        input,
+        .setting-row {
+            -webkit-app-region: no-drag;
+        }
+    </style>
+</head>
+
+<body class="hidden">
+
+    <!-- UI Layer Removed -->
+
+    <div id="large-overlay" style="
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: #00ffcc;
+    padding: 30px;
+    border-radius: 15px;
+    font-size: 2rem;
+    font-weight: bold;
+    text-align: center;
+    z-index: 10000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    border: 2px solid #00ffcc;
+    box-shadow: 0 0 30px rgba(0, 255, 204, 0.5);
+    max-width: 80vw;
+"></div>
+    <div id="orb-shadow"></div>
+    <div id="canvas-container"></div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // --- Logger Override ---
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            const oldLog = console.log;
+            const oldError = console.error;
+            console.log = (...args) => {
+                oldLog(...args);
+                ipcRenderer.send('log-from-renderer', 'INFO', args.map(a => String(a)).join(' '));
+            };
+            console.error = (...args) => {
+                oldError(...args);
+                ipcRenderer.send('log-from-renderer', 'ERROR', args.map(a => String(a)).join(' '));
+            };
+            window.onerror = (msg, url, line) => {
+                ipcRenderer.send('log-from-renderer', 'CRITICAL', `${msg} at ${url}:${line}`);
+            };
+        }
+
+        // Import Stats.js using CommonJS (Electron)
+        // --- Configuration & State ---
+        let scene, camera, renderer, orbMesh, particleSystem, lightMain, lightAmbient;
+        let audioContext, analyser, dataArray;
+        let isListening = false;
+        let isRecordingVisual = false; // Visual state for recording indicator
+        let recordingTransition = 0; // Smooth transition 0-1 for recording state
+        let targetOrbOpacity = 1.0; // Target opacity for orb
+        let currentOrbOpacity = 0.0; // Start invisible for entry animation
+        let time = 0;
+        let scaleGroup; // Added scaleGroup variable
+
+        // Entry animation targets
+        let targetDisplayScale = 0.4;
+        let currentDisplayScale = 0.0; // Start at 0 size for smooth entry
+        let currentDragScale = 0.4; // Track orb scale for hit testing (set on load)
+
+        // Base geometry reuse
+        const sphereGeoHigh = new THREE.SphereGeometry(2, 64, 64);
+        const sphereGeoLow = new THREE.SphereGeometry(2, 16, 16);
+        const icosaGeo = new THREE.IcosahedronGeometry(2, 2);
+
+        // --- Audio Handling ---
+        async function startAudio() {
+            console.log("startAudio() called");
+
+            if (isListening) {
+                console.log("Already listening, ignoring call.");
+                return;
+            }
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.error("navigator.mediaDevices.getUserMedia is not supported/available.");
+                return;
+            }
+
+            try {
+                console.log("Requesting microphone access...");
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                globalStream = stream; // Save for recorder
+                console.log("Microphone access granted.");
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // explicitly resume context if suspended (common browser policy)
+                if (audioContext.state === 'suspended') {
+                    console.log("Resuming suspended AudioContext...");
+                    await audioContext.resume();
+                }
+
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 512;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                source.connect(analyser);
+
+                isListening = true;
+                console.log("Audio setup complete. Visualizer should be active.");
+            } catch (err) {
+                console.error("Mic Error:", err);
+            }
+        }
+
+        // --- Recording Logic ---
+        let mediaRecorder;
+        let audioChunks = [];
+
+        async function setupRecording() {
+            if (!isListening || !audioContext) {
+                alert("Please start the microphone first!");
+                return;
+            }
+
+            // We need a stream from the AudioContext or the original stream. 
+            // Since we didn't save the original stream globally in startAudio, we might need to capture it again or save it.
+            // Let's modify startAudio to save 'globalStream'.
+            // For now, let's assume we can get it from the inputs or just request it again (simpler for now).
+            // Actually, requesting again might trigger permission prompt again.
+            // Better: Let's use the 'dest' node if we can, or just save the stream in startAudio.
+        }
+
+        // UPDATED startAudio to save stream to global variable 'globalStream'
+        let globalStream;
+
+        // --- Interaction ---
+        let baseScale = 1;
+        let currentPresetIndex = 2; // Default to Jarvis (Blue Wireframe)
+
+        /* Legacy UI Logic Removed */
+
+        // Update preset update function to respect baseScale
+        // We need to modify the 'update' calls in the 'animate' loop or the preset definitions.
+        // Easiest is to multiply the final scale in the animate loop? 
+        // Actually, most presets set scale.setScalar(). We should modify the presets to use a multiplier.
+        // OR simpler: Apply the scale to a PARENT group.
+
+        // Let's wrap the orbMesh in a 'scaleGroup' when loading.
+        // Note: scaleGroup is created and added to scene in init()
+
+        // REDEFINE loadPreset to use scaleGroup
+        // Wait, we can't redefine 'loadPreset' easily here without replacing the whole block.
+        // Instead, let's just use the slider to set camera zoom? No, that changes perspective.
+        // Let's just create the scaleGroup and add the mesh to it.
+
+        // IPC Control from Main Process (AltGr Global Hook)
+        if (window.require) {
+            const { ipcRenderer, clipboard } = window.require('electron');
+
+            // --- Direct Drag Support (Circular Hit Test) ---
+            let isDragging = false;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            let currentDragScale = 1.0; // Track orb scale for hit testing
+
+            // Check if click is within the circular orb area
+            function isInsideOrb(clientX, clientY) {
+                const centerX = window.innerWidth / 2;
+                const centerY = window.innerHeight / 2;
+                // Use actual orb scale - base orb radius is about 80px at scale 1.0
+                // The 3D sphere has radius 2 units, camera at z=6, so ~80px visual at scale 1.0
+                const baseRadius = 80;
+                const orbRadius = baseRadius * currentDisplayScale;
+
+                const dx = clientX - centerX;
+                const dy = clientY - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                return distance <= orbRadius;
+            }
+
+            document.addEventListener('mousedown', (e) => {
+                if (e.button === 0 && isInsideOrb(e.clientX, e.clientY)) {
+                    isDragging = true;
+                    dragStartX = e.screenX;
+                    dragStartY = e.screenY;
+                    document.body.style.cursor = 'grabbing';
+                }
+            });
+
+            let wasInsideOrb = false;
+
+            document.addEventListener('mousemove', (e) => {
+                // If dragging, process movement and ignore hit testing
+                if (isDragging) {
+                    const deltaX = e.screenX - dragStartX;
+                    const deltaY = e.screenY - dragStartY;
+                    dragStartX = e.screenX;
+                    dragStartY = e.screenY;
+                    ipcRenderer.send('move-window', { deltaX, deltaY });
+                    return;
+                }
+
+                // Toggle mouse capture based on orb position
+                const insideNow = isInsideOrb(e.clientX, e.clientY);
+                if (insideNow !== wasInsideOrb) {
+                    wasInsideOrb = insideNow;
+                    ipcRenderer.send('set-mouse-capture', insideNow);
+                    document.body.style.cursor = insideNow ? 'grab' : 'default';
+                }
+            });
+
+            document.addEventListener('mouseup', (e) => {
+                if (isDragging) {
+                    isDragging = false;
+
+                    // Re-evaluate mouse capture state immediately after drop
+                    const insideNow = isInsideOrb(e.clientX, e.clientY);
+                    wasInsideOrb = insideNow;
+                    ipcRenderer.send('set-mouse-capture', insideNow);
+                    document.body.style.cursor = insideNow ? 'grab' : 'default';
+                }
+            });
+
+            // Prevent context menu on right-click (only on orb)
+            document.addEventListener('contextmenu', (e) => {
+                if (isInsideOrb(e.clientX, e.clientY)) {
+                    e.preventDefault();
+                    ipcRenderer.send('open-context-menu');
+                }
+            });
+
+            // Fade In/Out handlers for elegant transitions
+            ipcRenderer.on('fade-in', () => {
+                document.body.classList.remove('hidden');
+            });
+
+            ipcRenderer.on('fade-out', () => {
+                document.body.classList.add('hidden');
+            });
+
+            // Show overlay preview text
+            ipcRenderer.on('show-overlay-text', (event, text) => {
+                const overlay = document.getElementById('large-overlay');
+                if (overlay) {
+                    overlay.textContent = text;
+                    overlay.style.opacity = '1';
+                    overlay.style.color = '#00ffcc';
+                    // Auto-hide after 3 seconds
+                    setTimeout(() => { overlay.style.opacity = '0'; }, 3000);
+                }
+            });
+
+            // Handle Real-time Config Updates
+            ipcRenderer.on('config-updated', (event, newConfig) => {
+                // Scale
+                if (newConfig.orb_scale !== undefined) {
+                    targetDisplayScale = newConfig.orb_scale; // Smooth scale transition
+                    currentDragScale = newConfig.orb_scale; // Update drag hit test scale
+                }
+
+                // Orb Opacity
+                if (newConfig.orb_opacity !== undefined) {
+                    targetOrbOpacity = newConfig.orb_opacity;
+                }
+
+                // Overlay Opacity & Visibility
+                const overlay = document.getElementById('large-overlay');
+                if (newConfig.overlay_opacity !== undefined) {
+                    overlay.dataset.opacitySettings = newConfig.overlay_opacity;
+                    if (overlay.style.opacity > 0) {
+                        overlay.style.opacity = newConfig.overlay_opacity;
+                    }
+                }
+
+                if (newConfig.show_overlay !== undefined) {
+                    overlay.dataset.visibleSettings = newConfig.show_overlay;
+                    if (!newConfig.show_overlay) {
+                        overlay.style.visibility = 'hidden';
+                    } else {
+                        overlay.style.visibility = 'visible';
+                    }
+                }
+
+                // Preset
+                if (newConfig.preset !== undefined) {
+                    loadPreset(newConfig.preset);
+                }
+            });
+
+            // Drag Mode Handler
+            ipcRenderer.on('drag-mode-changed', (event, enabled) => {
+                if (enabled) {
+                    document.body.style.background = 'rgba(0, 100, 255, 0.1)';
+                    document.body.style.border = '2px dashed #00d2ff';
+                    document.body.classList.add('draggable');
+                } else {
+                    document.body.style.background = 'transparent';
+                    document.body.style.border = 'none';
+                    document.body.classList.remove('draggable');
+                }
+            });
+
+            // NOTE: Primary start-recording handler is defined below with full logic
+
+
+            // Stop Recording (AltGr Up)
+            let recordingStartTime = 0;
+            let recordingCount = 0; // Track total recordings
+
+            ipcRenderer.on('start-recording', () => {
+                recordingCount++;
+                console.log(`[REC #${recordingCount}] start-recording received`);
+                console.log(`[REC #${recordingCount}] globalStream exists: ${!!globalStream}`);
+                console.log(`[REC #${recordingCount}] mediaRecorder state: ${mediaRecorder ? mediaRecorder.state : 'null'}`);
+
+                if (!globalStream) {
+                    console.log(`[REC #${recordingCount}] BLOCKED: No globalStream!`);
+                    return;
+                }
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    console.log(`[REC #${recordingCount}] BLOCKED: Already recording`);
+                    return;
+                }
+
+                console.log(`[REC #${recordingCount}] Starting new recording...`);
+                isRecordingVisual = true; // Enable recording visual
+                recordingStartTime = Date.now();
+                audioChunks = [];
+
+                try {
+                    mediaRecorder = new MediaRecorder(globalStream, { mimeType: 'audio/webm' });
+                    console.log(`[REC #${recordingCount}] MediaRecorder created successfully`);
+                } catch (e) {
+                    console.error(`[REC #${recordingCount}] MediaRecorder creation FAILED:`, e);
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        console.log(`[REC #${recordingCount}] Data chunk: ${event.data.size} bytes`);
+                    }
+                };
+
+                mediaRecorder.onerror = (e) => {
+                    console.error(`[REC #${recordingCount}] MediaRecorder ERROR:`, e);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const duration = Date.now() - recordingStartTime;
+                    console.log(`[REC #${recordingCount}] Recording stopped. Duration: ${duration}ms, Chunks: ${audioChunks.length}`);
+                    const overlay = document.getElementById('large-overlay');
+
+                    // Helper to Set Visibility/Opacity
+                    const showOverlay = (text, color = "#00ffcc", autoHide = false) => {
+                        // Check if overlay should be visible
+                        if (overlay.dataset.visibleSettings === 'false') {
+                            overlay.style.visibility = 'hidden';
+                            // If we want to hide it completely even from occupying space effectively (though it is fixed pos)
+                            // But keeping it hidden is enough.
+                            return;
+                        } else {
+                            overlay.style.visibility = 'visible';
+                        }
+
+                        overlay.textContent = text;
+                        overlay.style.color = color;
+
+                        let op = 1;
+                        if (overlay.dataset.opacitySettings !== undefined) {
+                            op = parseFloat(overlay.dataset.opacitySettings);
+                        }
+                        overlay.style.opacity = op;
+
+                        if (autoHide) {
+                            setTimeout(() => { overlay.style.opacity = '0'; }, 3000); // 3s fade out
+                        }
+                    };
+
+                    // List of filler responses Whisper returns for empty/silent audio
+                    const fillerResponses = [
+                        'obrigado.', 'obrigado', 'obrigada.', 'obrigada',
+                        'thank you.', 'thank you', 'thanks.', 'thanks',
+                        'legendas pela comunidade', 'legendas por',
+                        'amara.org', 'www.amara.org'
+                    ];
+
+                    if (duration < 500) {
+                        console.log("Recording too short (<500ms), ignoring silently.");
+                        return; // No overlay for too short
+                    }
+
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+
+                    // No "Transcribing..." overlay - just wait silently
+
+                    try {
+                        const response = await ipcRenderer.invoke('transcribe-audio', arrayBuffer);
+                        if (response.error) {
+                            console.error("Transcription Error:", response.error);
+                            showOverlay("Error: " + response.error, "#ff0000", true);
+                        } else {
+                            const text = response.text.trim();
+                            console.log("Transcribed:", text);
+
+                            // Check if it's a filler/empty response
+                            const isFiller = fillerResponses.some(f =>
+                                text.toLowerCase() === f.toLowerCase() ||
+                                text.toLowerCase().includes('legendas')
+                            );
+
+                            if (isFiller || text.length < 3) {
+                                console.log("Filler/empty response detected, ignoring:", text);
+                                overlay.style.opacity = '0'; // Hide any "Transcribing..." overlay
+                                return;
+                            }
+
+                            // Copy to clipboard
+                            clipboard.writeText(text);
+                            // Auto-paste to active window
+                            ipcRenderer.send('auto-paste');
+
+                            // Show result
+                            showOverlay(text, "#00ffcc", true);
+                        }
+                    } catch (e) {
+                        console.error("IPC Error:", e);
+                        showOverlay("IPC Error", "#ff0000", true);
+                    }
+                };
+
+                mediaRecorder.start();
+            });
+
+            ipcRenderer.on('stop-recording', () => {
+                console.log(`[REC] stop-recording received. mediaRecorder state: ${mediaRecorder ? mediaRecorder.state : 'null'}`);
+                isRecordingVisual = false; // Disable recording visual
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    console.log("[REC] Stopping recording...");
+                    mediaRecorder.stop();
+                } else {
+                    console.log("[REC] Cannot stop - recorder is inactive or null");
+                }
+            });
+
+            // Menu Logic (Right Click)
+            // Menu Logic (Right Click)
+            window.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (window.require) {
+                    const { ipcRenderer } = window.require('electron');
+                    ipcRenderer.send('open-context-menu');
+                }
+            });
+
+            // Old UI interaction removed
+
+        }
+
+        // Manual Button Listeners Removed (UI elements deleted)
+
+        function getAudioData() {
+            if (!isListening) return { bass: 0.1, mid: 0.1, high: 0.1, avg: 0.1 };
+            analyser.getByteFrequencyData(dataArray);
+
+            // Split into bands
+            const bass = getAverage(dataArray, 0, 10);
+            const mid = getAverage(dataArray, 10, 100);
+            const high = getAverage(dataArray, 100, 200);
+            const avg = getAverage(dataArray, 0, 255);
+
+            return {
+                bass: bass / 255,
+                mid: mid / 255,
+                high: high / 255,
+                avg: avg / 255
+            };
+        }
+
+        function getAverage(array, start, end) {
+            let sum = 0;
+            for (let i = start; i < end; i++) sum += array[i];
+            return sum / (end - start);
+        }
+
+        // --- Scene Setup ---
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 6;
+
+            renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true,
+                powerPreference: "high-performance",
+                precision: "highp"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            // Ensure at least 2.0 pixel ratio for supersampling smoothness
+            renderer.setPixelRatio(Math.max(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Lights
+            lightAmbient = new THREE.AmbientLight(0x404040);
+            scene.add(lightAmbient);
+
+            lightMain = new THREE.PointLight(0xffffff, 1, 100);
+            lightMain.position.set(5, 5, 5);
+            scene.add(lightMain);
+
+            scaleGroup = new THREE.Group();
+            scene.add(scaleGroup);
+
+            // Initial Preset - Deep Void (0) as default
+            loadPreset(0);
+
+            window.addEventListener('resize', onWindowResize, false);
+            animate();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Presets Definition (Consolidated: 5 presets) ---
+        const presets = [
+            // 0. Deep Void (was 9) - DEFAULT
+            {
+                setup: () => {
+                    const group = new THREE.Group();
+
+                    // Real-time reflections require a CubeCamera
+                    const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+                        generateMipmaps: true,
+                        minFilter: THREE.LinearMipmapLinearFilter
+                    });
+                    cubeRenderTarget.texture.mapping = THREE.CubeReflectionMapping;
+                    const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
+                    group.add(cubeCamera);
+
+                    // The black reflective sphere
+                    const mat = new THREE.MeshPhysicalMaterial({
+                        color: 0x000000,
+                        metalness: 1.0,
+                        roughness: 0.02,
+                        clearcoat: 1.0,
+                        clearcoatRoughness: 0.0,
+                        envMap: cubeRenderTarget.texture,
+                        envMapIntensity: 5.0
+                    });
+                    const sphere = new THREE.Mesh(sphereGeoHigh, mat);
+                    group.add(sphere);
+
+                    // White rim
+                    const rimMat = new THREE.MeshStandardMaterial({
+                        color: 0x000000,
+                        emissive: 0xffffff,
+                        emissiveIntensity: 1
+                    });
+                    const rim = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.08, 16, 100), rimMat);
+                    group.add(rim);
+
+                    group.userData = { cubeCamera, sphere, rim };
+                    return group;
+                },
+                update: (group, data) => {
+                    const { sphere, rim, cubeCamera } = group.userData;
+
+                    // Smooth transition for recording state
+                    const targetRecording = isRecordingVisual ? 1.0 : 0.0;
+                    recordingTransition += (targetRecording - recordingTransition) * 0.1;
+
+                    // RECORDING EFFECT: Ring turns RED and becomes THICKER
+                    const baseScale = 1 + data.bass * 0.2;
+                    rim.scale.setScalar(baseScale);
+                    rim.rotation.x = time;
+                    rim.rotation.y = time * 0.5;
+                    rim.scale.z = 1 + recordingTransition * 2;
+
+                    const idleColor = new THREE.Color(0xffffff);
+                    const recordingColor = new THREE.Color(0xff0000);
+                    rim.material.emissive.lerpColors(idleColor, recordingColor, recordingTransition);
+
+                    const idleIntensity = 1.5 + (data.avg * 8.0);
+                    const recordingIntensity = 4.0 + (data.avg * 6.0);
+                    rim.material.emissiveIntensity = idleIntensity + (recordingIntensity - idleIntensity) * recordingTransition;
+
+                    // Render reflection
+                    const oldBg = scene.background;
+                    scene.background = new THREE.Color(0x000000);
+                    sphere.visible = false;
+                    cubeCamera.update(renderer, scene);
+                    sphere.visible = true;
+                    scene.background = oldBg;
+                }
+            },
+            // 1. Classic Siri (was 0)
+            {
+                setup: () => {
+                    const mat = new THREE.MeshPhongMaterial({
+                        color: 0x111111, emissive: 0x0088ff, emissiveIntensity: 0.5,
+                        shininess: 100, opacity: 0.9, transparent: true
+                    });
+                    return new THREE.Mesh(sphereGeoHigh, mat);
+                },
+                update: (mesh, data) => {
+                    // Smooth transition for recording state
+                    const targetRecording = isRecordingVisual ? 1.0 : 0.0;
+                    recordingTransition += (targetRecording - recordingTransition) * 0.1;
+
+                    mesh.scale.setScalar(1 + data.bass * 0.4);
+                    mesh.rotation.y += 0.01 + recordingTransition * 0.05; // FASTER rotation when recording
+
+                    // RECORDING EFFECT: Color shifts to RED-ORANGE, pulses faster
+                    const idleColor = new THREE.Color(0x0088ff);
+                    const recordingColor = new THREE.Color(0xff4400);
+                    mesh.material.emissive.lerpColors(idleColor, recordingColor, recordingTransition);
+
+                    const baseIntensity = 0.5 + data.high * 2;
+                    mesh.material.emissiveIntensity = baseIntensity + recordingTransition * 2.0;
+                }
+            },
+            // 2. Toxic Sludge (was 5)
+            {
+                setup: () => {
+                    const mat = new THREE.MeshPhongMaterial({
+                        color: 0x00ff00, shininess: 30, flatShading: true
+                    });
+                    return new THREE.Mesh(new THREE.IcosahedronGeometry(2, 5), mat);
+                },
+                update: (mesh, data) => {
+                    // Smooth transition for recording state
+                    const targetRecording = isRecordingVisual ? 1.0 : 0.0;
+                    recordingTransition += (targetRecording - recordingTransition) * 0.1;
+
+                    // RECORDING EFFECT: Bubbles ACCELERATE, turn RADIOACTIVE ORANGE
+                    mesh.rotation.y += 0.01 + recordingTransition * 0.08;
+                    mesh.scale.setScalar(1 + data.bass * 0.3 + Math.sin(time * (5 + recordingTransition * 10)) * 0.1);
+
+                    const idleColor = new THREE.Color(0x00ff00);
+                    const recordingColor = new THREE.Color(0xff6600);
+                    mesh.material.color.lerpColors(idleColor, recordingColor, recordingTransition);
+                }
+            },
+            // 3. Geometric Low-Poly (was 13)
+            {
+                setup: () => {
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: 0x555555, flatShading: true, roughness: 0.2,
+                        emissive: 0x000000, emissiveIntensity: 0
+                    });
+                    return new THREE.Mesh(new THREE.DodecahedronGeometry(2), mat);
+                },
+                update: (mesh, data) => {
+                    // Smooth transition for recording state
+                    const targetRecording = isRecordingVisual ? 1.0 : 0.0;
+                    recordingTransition += (targetRecording - recordingTransition) * 0.1;
+
+                    mesh.rotation.x += 0.01 + recordingTransition * 0.03;
+                    mesh.rotation.y += 0.01 + recordingTransition * 0.03;
+                    mesh.scale.setScalar(1 + data.bass * 0.5);
+
+                    // RECORDING EFFECT: Wireframe PULSES RED, edges glow
+                    if (recordingTransition > 0.5) {
+                        mesh.material.wireframe = Math.sin(time * 20) > 0;
+                    } else {
+                        mesh.material.wireframe = false;
+                    }
+
+                    const idleColor = new THREE.Color(0x555555);
+                    const hue = data.avg;
+                    idleColor.setHSL(hue, 0.5, 0.5);
+
+                    const recordingColor = new THREE.Color(0xff0000);
+                    mesh.material.color.lerpColors(idleColor, recordingColor, recordingTransition * 0.7);
+                    mesh.material.emissive.set(recordingColor);
+                    mesh.material.emissiveIntensity = recordingTransition * 2.0;
+                }
+            },
+            // 4. Rusty Machine (was 17)
+            {
+                setup: () => {
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: 0x8b4513, roughness: 0.9, wireframe: true,
+                        emissive: 0x000000, emissiveIntensity: 0
+                    });
+                    return new THREE.Mesh(new THREE.TorusKnotGeometry(1.2, 0.4, 100, 16), mat);
+                },
+                update: (mesh, data) => {
+                    // Smooth transition for recording state
+                    const targetRecording = isRecordingVisual ? 1.0 : 0.0;
+                    recordingTransition += (targetRecording - recordingTransition) * 0.1;
+
+                    // RECORDING EFFECT: Gears SPIN FASTER, emit ORANGE SPARKS (emissive glow)
+                    mesh.rotation.x += data.bass * 0.1 + recordingTransition * 0.15;
+                    mesh.rotation.y += recordingTransition * 0.1;
+                    mesh.scale.setScalar(1 + data.mid * 0.2);
+
+                    // Sparks effect via emissive flicker
+                    const sparkIntensity = recordingTransition * (0.5 + Math.random() * 1.5);
+                    mesh.material.emissive.set(0xff4400);
+                    mesh.material.emissiveIntensity = sparkIntensity;
+                }
+            }
+        ];
+
+        function loadPreset(index) {
+            if (orbMesh) {
+                scaleGroup.remove(orbMesh);
+                if (orbMesh.geometry) orbMesh.geometry.dispose();
+            }
+
+            currentPresetIndex = index;
+            const preset = presets[index];
+            if (preset) {
+                orbMesh = preset.setup();
+                scaleGroup.add(orbMesh);
+            }
+        }
+
+        // --- Main Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            const audioData = getAudioData();
+
+            if (presets[currentPresetIndex] && orbMesh) {
+                presets[currentPresetIndex].update(orbMesh, audioData);
+            }
+
+            // Smooth orb opacity transition
+            currentOrbOpacity += (targetOrbOpacity - currentOrbOpacity) * 0.05; // Slightly slower for entry
+
+            // Smooth orb scale transition (entry animation)
+            currentDisplayScale += (targetDisplayScale - currentDisplayScale) * 0.05;
+            if (scaleGroup) {
+                scaleGroup.scale.setScalar(currentDisplayScale);
+            }
+
+            // Apply opacity to the canvas/renderer
+            if (renderer && renderer.domElement) {
+                renderer.domElement.style.opacity = currentOrbOpacity;
+            }
+
+            // Sync shadow opacity and scale
+            const shadow = document.getElementById('orb-shadow');
+            if (shadow) {
+                shadow.style.opacity = currentOrbOpacity;
+                // Scale shadow relative to its 80% base size to match orb growth
+                shadow.style.transform = `translate(-50%, -50%) scale(${currentDisplayScale})`;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- Interaction ---
+
+        // Auto-hide removed - visibility is managed by main process
+        /*
+        setTimeout(() => {
+            document.body.classList.add('hidden');
+        }, 5000);
+        */
+
+        // Electron IPC for visibility toggle
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.on('toggle-visibility', () => {
+                document.body.classList.toggle('hidden');
+            });
+        }
+
+        /* Listeners Removed */
+
+        async function loadSavedConfig() {
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                try {
+                    const config = await ipcRenderer.invoke('get-config');
+
+                    if (config.orb_scale !== undefined && scaleGroup) {
+                        scaleGroup.scale.setScalar(config.orb_scale);
+                    }
+
+                    if (config.preset !== undefined) {
+                        loadPreset(config.preset);
+                    }
+
+                    const overlay = document.getElementById('large-overlay');
+                    if (config.overlay_opacity !== undefined) {
+                        overlay.dataset.opacitySettings = config.overlay_opacity;
+                    }
+                    if (config.show_overlay !== undefined) {
+                        overlay.dataset.visibleSettings = config.show_overlay;
+                        overlay.style.visibility = config.show_overlay ? 'visible' : 'hidden';
+                    }
+
+                } catch (e) {
+                    console.error("Failed to load startup config:", e);
+                }
+            }
+        }
+
+        // Load config BEFORE init to get correct scale from the start
+        async function startupSequence() {
+            // Pre-load config to get scale before first render
+            let initialScale = 1.0;
+            let initialPreset = 0; // Deep Void is index 0
+
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                try {
+                    const config = await ipcRenderer.invoke('get-config');
+                    if (config.orb_scale !== undefined) {
+                        initialScale = config.orb_scale;
+                    }
+                    if (config.preset !== undefined) {
+                        initialPreset = config.preset;
+                    }
+                    if (config.orb_opacity !== undefined) {
+                        targetOrbOpacity = config.orb_opacity;
+                    }
+
+                    // Store overlay settings
+                    const overlay = document.getElementById('large-overlay');
+                    if (config.overlay_opacity !== undefined) {
+                        overlay.dataset.opacitySettings = config.overlay_opacity;
+                    }
+                    if (config.show_overlay !== undefined) {
+                        overlay.dataset.visibleSettings = config.show_overlay;
+                        overlay.style.visibility = config.show_overlay ? 'visible' : 'hidden';
+                    }
+                } catch (e) {
+                    console.error("Failed to load startup config:", e);
+                }
+            }
+
+            // Now init with correct settings
+            init();
+
+            // Set targets for entry animation
+            targetDisplayScale = initialScale;
+            currentDragScale = initialScale;
+
+            // Always load preset from config
+            loadPreset(initialPreset);
+
+            // Start invisible and small (already initialized in variables)
+            // But ensure target opacity is set based on config if exists
+            // (Assuming targetOrbOpacity default is 1.0, we might want to get it from config)
+
+            startAudio();
+
+            // Reveal after everything is ready (next frame to ensure render completed)
+            requestAnimationFrame(() => {
+                document.body.classList.remove('hidden');
+            });
+        }
+
+        startupSequence();
+
+    </script>
+</body>
+
+</html>

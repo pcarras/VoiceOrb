@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Debug logs
+orb_debug.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Config with API keys (user should copy from .example)
+whisper4u.ini

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Orb Settings</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --card-bg: #252525;
+            --primary: #00d2ff;
+            --text: #ffffff;
+            --text-secondary: #888888;
+            --border: #333333;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        body {
+            margin: 0;
+            padding: 15px 20px;
+            background-color: var(--bg-color);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin: 0 0 12px 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        h2 {
+            margin: 0 0 8px 0;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .section {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .setting-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .setting-row label {
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 55%;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .slider-value {
+            font-family: monospace;
+            font-size: 0.85rem;
+            min-width: 40px;
+            text-align: right;
+            color: var(--primary);
+        }
+
+        input[type="password"],
+        input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: #111;
+            color: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            margin-top: 6px;
+        }
+
+        input[type="password"]:focus,
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #111;
+            color: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .info {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #444;
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--primary);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        .shortcut-key {
+            background: #333;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 40px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        button.primary {
+            background: var(--primary);
+            color: #000;
+        }
+
+        button.primary:hover {
+            background: #00b8e0;
+            transform: scale(1.02);
+        }
+    </style>
+</head>
+
+<body>
+    <h1>⚙️ Voice Orb Settings</h1>
+
+    <div class="section">
+        <h2>API</h2>
+        <div>
+            <label>Groq API Key</label>
+            <input type="password" id="groq-key" placeholder="gsk_...">
+        </div>
+        <div class="info">Required for transcription. Stored locally only.</div>
+    </div>
+
+    <div class="section">
+        <h2>Preset</h2>
+        <select id="preset-selector">
+            <option value="0" selected>1. Deep Void</option>
+            <option value="1">2. Classic Siri</option>
+            <option value="2">3. Toxic Sludge</option>
+            <option value="3">4. Geometric Low-Poly</option>
+            <option value="4">5. Rusty Machine</option>
+        </select>
+    </div>
+
+    <div class="section">
+        <h2>Appearance</h2>
+        <div class="setting-row">
+            <label>Orb Scale</label>
+            <div class="slider-container">
+                <input type="range" id="orb-scale" min="0.2" max="1.0" step="0.1" value="0.4">
+                <span id="scale-value" class="slider-value">0.4</span>
+            </div>
+        </div>
+
+        <div class="setting-row">
+            <label>Orb Opacity</label>
+            <div class="slider-container">
+                <input type="range" id="orb-opacity" min="0.1" max="1.0" step="0.05" value="1.0">
+                <span id="orb-opacity-value" class="slider-value">100%</span>
+            </div>
+        </div>
+
+        <div class="setting-row">
+            <label>Overlay Opacity</label>
+            <div class="slider-container">
+                <input type="range" id="overlay-opacity" min="0.0" max="1.0" step="0.1" value="1.0">
+                <span id="opacity-value" class="slider-value">1.0</span>
+            </div>
+        </div>
+
+        <div class="setting-row">
+            <label>Show Transcription</label>
+            <label class="switch">
+                <input type="checkbox" id="show-overlay" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Shortcut</h2>
+        <div style="display: flex; gap: 10px;">
+            <div style="flex: 1;">
+                <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-size: 0.7rem;">KEY
+                    1</label>
+                <select id="shortcut-key-1" style="width: 100%; padding: 6px;">
+                    <option value="3640">AltGr</option>
+                    <option value="3613">Ctrl Right</option>
+                    <option value="29">Ctrl Left</option>
+                    <option value="42">Shift Left</option>
+                    <option value="54">Shift Right</option>
+                    <option value="56">Alt Left</option>
+                    <option value="57">Space</option>
+                    <option value="41">Backtick</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-size: 0.7rem;">KEY
+                    2</label>
+                <select id="shortcut-key-2" style="width: 100%; padding: 6px;">
+                    <option value="0">None</option>
+                    <option value="57">Space</option>
+                    <option value="3640">AltGr</option>
+                    <option value="29">Ctrl Left</option>
+                    <option value="42">Shift Left</option>
+                    <option value="56">Alt Left</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+
+</html>
