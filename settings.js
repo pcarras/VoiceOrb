@@ -9,6 +9,10 @@ const orbOpacityValue = document.getElementById('orb-opacity-value');
 
 const opacitySlider = document.getElementById('overlay-opacity');
 const opacityValue = document.getElementById('opacity-value');
+
+const shadowOpacitySlider = document.getElementById('shadow-opacity');
+const shadowOpacityValue = document.getElementById('shadow-opacity-value');
+
 const showOverlayCheck = document.getElementById('show-overlay');
 
 const presetSelector = document.getElementById('preset-selector');
@@ -24,6 +28,7 @@ function sendPreview() {
         orb_scale: parseFloat(scaleSlider.value),
         orb_opacity: parseFloat(orbOpacitySlider.value),
         overlay_opacity: parseFloat(opacitySlider.value),
+        shadow_opacity: parseFloat(shadowOpacitySlider.value),
         show_overlay: showOverlayCheck.checked,
         preset: parseInt(presetSelector.value),
         shortcut: [parseInt(shortcutKey1.value), parseInt(shortcutKey2.value)].filter(k => k > 0)
@@ -40,6 +45,7 @@ async function saveConfig() {
         orb_scale: parseFloat(scaleSlider.value),
         orb_opacity: parseFloat(orbOpacitySlider.value),
         overlay_opacity: parseFloat(opacitySlider.value),
+        shadow_opacity: parseFloat(shadowOpacitySlider.value),
         show_overlay: showOverlayCheck.checked,
         preset: parseInt(presetSelector.value),
         shortcut: [parseInt(shortcutKey1.value), parseInt(shortcutKey2.value)].filter(k => k > 0)
@@ -71,6 +77,11 @@ orbOpacitySlider.addEventListener('input', () => {
 
 opacitySlider.addEventListener('input', () => {
     opacityValue.textContent = parseFloat(opacitySlider.value).toFixed(1);
+    sendPreview();
+});
+
+shadowOpacitySlider.addEventListener('input', () => {
+    shadowOpacityValue.textContent = parseFloat(shadowOpacitySlider.value).toFixed(2);
     sendPreview();
 });
 
@@ -107,6 +118,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (config.overlay_opacity !== undefined) {
             opacitySlider.value = config.overlay_opacity;
             opacityValue.textContent = parseFloat(config.overlay_opacity).toFixed(1);
+        }
+
+        if (config.shadow_opacity !== undefined) {
+            shadowOpacitySlider.value = config.shadow_opacity;
+            shadowOpacityValue.textContent = parseFloat(config.shadow_opacity).toFixed(2);
         }
 
         if (config.show_overlay !== undefined) {

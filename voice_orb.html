@@ -28,19 +28,23 @@
             transform: translate(-50%, -50%) scale(0);
             width: 65%;
             height: 65%;
-            background: radial-gradient(circle, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.1) 40%, rgba(0, 0, 0, 0) 80%);
+            background: radial-gradient(circle, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 40%, rgba(0, 0, 0, 0) 80%);
             border-radius: 50%;
             pointer-events: none;
-            z-index: -1;
-            transition: opacity 0.3s ease;
+            z-index: 0;
+            /* Shadow layer - below canvas */
+            /* transition: opacity 0.3s ease; -- REMOVED to allow JS realtime control */
         }
 
         /* ... rest of styles ... */
         #canvas-container {
+            position: relative;
             width: 100vw;
             height: 100vh;
             display: block;
             background: transparent;
+            z-index: 1;
+            /* Canvas layer - above shadow */
         }
 
         #ui-layer {
@@ -217,23 +221,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
+        const { ipcRenderer, clipboard } = require('electron');
+
         // --- Logger Override ---
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            const oldLog = console.log;
-            const oldError = console.error;
-            console.log = (...args) => {
-                oldLog(...args);
-                ipcRenderer.send('log-from-renderer', 'INFO', args.map(a => String(a)).join(' '));
-            };
-            console.error = (...args) => {
-                oldError(...args);
-                ipcRenderer.send('log-from-renderer', 'ERROR', args.map(a => String(a)).join(' '));
-            };
-            window.onerror = (msg, url, line) => {
-                ipcRenderer.send('log-from-renderer', 'CRITICAL', `${msg} at ${url}:${line}`);
-            };
-        }
+        const oldLog = console.log;
+        const oldError = console.error;
+        console.log = (...args) => {
+            oldLog(...args);
+            ipcRenderer.send('log-from-renderer', 'INFO', args.map(a => String(a)).join(' '));
+        };
+        console.error = (...args) => {
+            oldError(...args);
+            ipcRenderer.send('log-from-renderer', 'ERROR', args.map(a => String(a)).join(' '));
+        };
+        window.onerror = (msg, url, line) => {
+            ipcRenderer.send('log-from-renderer', 'CRITICAL', `${msg} at ${url}:${line}`);
+        };
 
         // Import Stats.js using CommonJS (Electron)
         // --- Configuration & State ---
@@ -251,6 +254,7 @@
         let targetDisplayScale = 0.4;
         let currentDisplayScale = 0.0; // Start at 0 size for smooth entry
         let currentDragScale = 0.4; // Track orb scale for hit testing (set on load)
+        let hasCompletedEntryAnimation = false; // Flag to track if initial animation is done
 
         // Base geometry reuse
         const sphereGeoHigh = new THREE.SphereGeometry(2, 64, 64);
@@ -258,6 +262,13 @@
         const icosaGeo = new THREE.IcosahedronGeometry(2, 2);
 
         // --- Audio Handling ---
+        // Initialize AudioContext immediately for SFX, irrespective of Mic permission
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            console.error("AudioContext init failed:", e);
+        }
+
         async function startAudio() {
             console.log("startAudio() called");
 
@@ -277,27 +288,95 @@
                 globalStream = stream; // Save for recorder
                 console.log("Microphone access granted.");
 
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-                // explicitly resume context if suspended (common browser policy)
-                if (audioContext.state === 'suspended') {
-                    console.log("Resuming suspended AudioContext...");
+                // Resume context if suspended (browser policy)
+                if (audioContext && audioContext.state === 'suspended') {
                     await audioContext.resume();
                 }
 
-                const source = audioContext.createMediaStreamSource(stream);
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 512;
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-                source.connect(analyser);
+                if (audioContext) {
+                    const source = audioContext.createMediaStreamSource(stream);
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 512;
+                    dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    source.connect(analyser);
 
-                isListening = true;
-                console.log("Audio setup complete. Visualizer should be active.");
+                    isListening = true;
+                    console.log("Audio setup complete. Visualizer should be active.");
+                }
+
             } catch (err) {
                 console.error("Mic Error:", err);
             }
         }
+        let targetShadowIntensity = 0.5; // Default shadow intensity
 
+        // --- Sound Effects (Web Audio API) ---
+        // --- Sound Effects (Web Audio API) ---
+        async function playTone(freqStart, freqEnd, duration, type = 'sine') {
+            if (!audioContext) return;
+            // Ensure context is running (fixes silent enter sound)
+            if (audioContext.state === 'suspended') {
+                try {
+                    await audioContext.resume();
+                } catch (e) {
+                    console.error("Audio resume failed:", e);
+                }
+            }
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(freqStart, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(freqEnd, audioContext.currentTime + duration);
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function playEnterSound() {
+            // Sci-fi power up sweep
+            playTone(200, 800, 0.4, 'sine');
+            setTimeout(() => playTone(300, 600, 0.3, 'triangle'), 100);
+        }
+
+        function playExitSound() {
+            // Power down sweep
+            playTone(800, 100, 0.5, 'sine');
+            setTimeout(() => playTone(600, 100, 0.4, 'triangle'), 100);
+        }
+
+        // --- IPC Event Listeners ---
+        ipcRenderer.on('fade-in', () => {
+            currentDisplayScale = 0.0; // Reset for pop-up effect
+            targetDisplayScale = parseFloat(appConfig.orb_scale) || 0.4;
+            currentOrbOpacity = 0.0;
+            targetOrbOpacity = parseFloat(appConfig.orb_opacity) || 1.0;
+            playEnterSound();
+        });
+
+        ipcRenderer.on('fade-out', () => {
+            targetOrbOpacity = 0.0;
+        });
+
+        // Handle Application Exit (Sound + Shrink)
+        ipcRenderer.on('exit-app', () => {
+            playExitSound();
+            // Animate shrink
+            targetDisplayScale = 0.0;
+            targetOrbOpacity = 0.0;
+
+            // Wait for animation/sound then tell main to quit
+            setTimeout(() => {
+                ipcRenderer.send('app-exit-finished');
+            }, 800); // 800ms allows for 500ms sound + animation
+        });
         // --- Recording Logic ---
         let mediaRecorder;
         let audioChunks = [];
@@ -425,6 +504,12 @@
                 document.body.classList.add('hidden');
             });
 
+            // When settings window opens, ensure scale is synced to prevent animation
+            ipcRenderer.on('settings-opened', () => {
+                console.log("[DEBUG] settings-opened received - syncing scale");
+                currentDisplayScale = targetDisplayScale;
+            });
+
             // Show overlay preview text
             ipcRenderer.on('show-overlay-text', (event, text) => {
                 const overlay = document.getElementById('large-overlay');
@@ -439,10 +524,18 @@
 
             // Handle Real-time Config Updates
             ipcRenderer.on('config-updated', (event, newConfig) => {
+                console.log("[DEBUG] config-updated received:", JSON.stringify(newConfig));
+
                 // Scale
                 if (newConfig.orb_scale !== undefined) {
-                    targetDisplayScale = newConfig.orb_scale; // Smooth scale transition
-                    currentDragScale = newConfig.orb_scale; // Update drag hit test scale
+                    const diff = Math.abs(newConfig.orb_scale - targetDisplayScale);
+                    console.log(`[DEBUG] Scale: current=${currentDisplayScale.toFixed(3)}, target=${targetDisplayScale.toFixed(3)}, new=${newConfig.orb_scale}, diff=${diff.toFixed(4)}`);
+                    // Only update if difference is significant to prevent jitter/reset
+                    if (diff > 0.01) {
+                        console.log(`[DEBUG] Scale CHANGING target from ${targetDisplayScale} to ${newConfig.orb_scale}`);
+                        targetDisplayScale = newConfig.orb_scale;
+                    }
+                    currentDragScale = newConfig.orb_scale;
                 }
 
                 // Orb Opacity
@@ -450,7 +543,13 @@
                     targetOrbOpacity = newConfig.orb_opacity;
                 }
 
-                // Overlay Opacity & Visibility
+                // Shadow Opacity (Independent)
+                if (newConfig.shadow_opacity !== undefined) {
+                    console.log("Config Update ID: Shadow Opacity received:", newConfig.shadow_opacity);
+                    targetShadowIntensity = newConfig.shadow_opacity;
+                }
+
+                // Overlay Opacity (Text only)
                 const overlay = document.getElementById('large-overlay');
                 if (newConfig.overlay_opacity !== undefined) {
                     overlay.dataset.opacitySettings = newConfig.overlay_opacity;
@@ -603,10 +702,8 @@
                                 return;
                             }
 
-                            // Copy to clipboard
-                            clipboard.writeText(text);
-                            // Auto-paste to active window
-                            ipcRenderer.send('auto-paste');
+                            // Auto-paste to active window (handled by main process now, including clipboard restore)
+                            ipcRenderer.send('auto-paste', text);
 
                             // Show result
                             showOverlay(text, "#00ffcc", true);
@@ -898,6 +995,8 @@
         ];
 
         function loadPreset(index) {
+            if (currentPresetIndex === index && orbMesh) return; // Prevent reload if same
+
             if (orbMesh) {
                 scaleGroup.remove(orbMesh);
                 if (orbMesh.geometry) orbMesh.geometry.dispose();
@@ -925,8 +1024,19 @@
             // Smooth orb opacity transition
             currentOrbOpacity += (targetOrbOpacity - currentOrbOpacity) * 0.05; // Slightly slower for entry
 
-            // Smooth orb scale transition (entry animation)
-            currentDisplayScale += (targetDisplayScale - currentDisplayScale) * 0.05;
+            // Smooth orb scale transition (ONLY during entry animation)
+            if (!hasCompletedEntryAnimation) {
+                currentDisplayScale += (targetDisplayScale - currentDisplayScale) * 0.05;
+                // Check if animation is essentially complete (99% of target)
+                if (Math.abs(currentDisplayScale - targetDisplayScale) < 0.005) {
+                    currentDisplayScale = targetDisplayScale;
+                    hasCompletedEntryAnimation = true;
+                    console.log("[DEBUG] Entry animation complete - scale locked");
+                }
+            } else {
+                // After entry animation, scale changes are INSTANT
+                currentDisplayScale = targetDisplayScale;
+            }
             if (scaleGroup) {
                 scaleGroup.scale.setScalar(currentDisplayScale);
             }
@@ -939,7 +1049,7 @@
             // Sync shadow opacity and scale
             const shadow = document.getElementById('orb-shadow');
             if (shadow) {
-                shadow.style.opacity = currentOrbOpacity;
+                shadow.style.opacity = currentOrbOpacity * targetShadowIntensity;
                 // Scale shadow relative to its 80% base size to match orb growth
                 shadow.style.transform = `translate(-50%, -50%) scale(${currentDisplayScale})`;
             }
@@ -1015,11 +1125,17 @@
                         targetOrbOpacity = config.orb_opacity;
                     }
 
+
                     // Store overlay settings
                     const overlay = document.getElementById('large-overlay');
                     if (config.overlay_opacity !== undefined) {
                         overlay.dataset.opacitySettings = config.overlay_opacity;
                     }
+
+                    if (config.shadow_opacity !== undefined) {
+                        targetShadowIntensity = config.shadow_opacity;
+                    }
+
                     if (config.show_overlay !== undefined) {
                         overlay.dataset.visibleSettings = config.show_overlay;
                         overlay.style.visibility = config.show_overlay ? 'visible' : 'hidden';
@@ -1034,20 +1150,24 @@
 
             // Set targets for entry animation
             targetDisplayScale = initialScale;
-            currentDragScale = initialScale;
+            currentDragScale = initialScale; // Important: set drag scale immediately
+            // Prevent "growing" animation if we are already at scale (approx)
+            currentDisplayScale = 0.0; // Start 0 for boot
+
+            // Wait - if this is BOOT, we WANT animation. 
+            // The user complained about animation when OPENING SETTINGS.
+            // That happens via 'config-updated'. I will fix that in the IPC handler.
 
             // Always load preset from config
             loadPreset(initialPreset);
-
-            // Start invisible and small (already initialized in variables)
-            // But ensure target opacity is set based on config if exists
-            // (Assuming targetOrbOpacity default is 1.0, we might want to get it from config)
 
             startAudio();
 
             // Reveal after everything is ready (next frame to ensure render completed)
             requestAnimationFrame(() => {
                 document.body.classList.remove('hidden');
+                // Play enter sound on startup
+                playEnterSound();
             });
         }
 

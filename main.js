@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, globalShortcut, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, globalShortcut, Tray, Menu, nativeImage, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -7,7 +7,9 @@ const { uIOhook, UiohookKey } = require('uiohook-napi');
 const util = require('util');
 
 // --- Logging Setup ---
-const logFile = path.join(__dirname, 'orb_debug.log');
+// Use userData for persistence in installed app
+const userDataPath = app.getPath('userData');
+const logFile = path.join(userDataPath, 'orb_debug.log');
 // Clear log on start
 try { fs.writeFileSync(logFile, `--- Log Started: ${new Date().toISOString()} ---\n`); } catch (e) { }
 
@@ -21,7 +23,14 @@ function fileLog(...args) {
 
 // Override console
 console.log = fileLog;
-console.error = (...args) => fileLog('[ERROR]', ...args);
+function error(...args) {
+    const msg = util.format(...args) + '\n';
+    try {
+        fs.appendFileSync(logFile, `[MAIN ERROR] ${msg}`);
+        process.stderr.write(`[MAIN ERROR] ${msg}`);
+    } catch (e) { }
+}
+console.error = error;
 
 // IPC Logger
 ipcMain.on('log-from-renderer', (event, type, message) => {
@@ -39,11 +48,18 @@ let tray = null;
 let isMenuOpen = false;
 
 // --- Config Logic ---
-const configPath = path.join(__dirname, 'whisper4u.ini');
+const configPath = path.join(userDataPath, 'whisper4u.ini');
 let appConfig = {
-    api_keys: { groq: "" },
+    api_keys: { groq: "" }, // Default embedded key
     window: { x: null, y: null },
     orb_scale: 0.4,
+    show_overlay: false,
+    overlay_opacity: 0.4,
+    shadow_opacity: 0.4,
+    orb_opacity: 1.0,
+    preset: 0, // Deep Void
+    model: "whisper-large-v3-turbo",
+    language: "pt",
     shortcut: [3640] // Default to AltGr
 };
 
@@ -124,13 +140,30 @@ ipcMain.on('menu-closed', () => {
     if (mainWindow) mainWindow.hide();
 });
 
+// Handle graceful exit after animation
+ipcMain.on('app-exit-finished', () => {
+    app.exit(); // Force exit bypassing listeners
+});
+
+
 // Auto-paste: simulate Ctrl+V to paste into active window
-ipcMain.on('auto-paste', () => {
-    // Small delay to ensure clipboard is ready and window focus restored
+ipcMain.on('auto-paste', (event, text) => {
+    // 1. Save current clipboard content
+    const originalText = clipboard.readText();
+
+    // 2. Write new text to clipboard
+    clipboard.writeText(text);
+
+    // 3. Paste
     setTimeout(() => {
         // Use PowerShell to send Ctrl+V (more reliable than uIOhook.keyTap)
         const { exec } = require('child_process');
-        exec('powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait(\'^v\')"');
+        exec('powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait(\'^v\')"', (error) => {
+            // 4. Restore original clipboard after a safety delay (ensure paste finished)
+            setTimeout(() => {
+                clipboard.writeText(originalText);
+            }, 700); // 700ms should be enough for Windows to process the paste
+        });
     }, 200);
 });
 
@@ -142,24 +175,68 @@ function createSettingsWindow() {
 
     settingsWindow = new BrowserWindow({
         width: 450,
-        height: 650,
-        title: "Settings - Voice Orb",
-        icon: path.join(__dirname, 'icon.png'),
+        height: 588,
         resizable: false,
-        minimizable: false,
-        alwaysOnTop: true,
-        autoHideMenuBar: true,
-        backgroundColor: '#1a1a1a',
+        frame: false, // Custom frame in HTML
+        alwaysOnTop: true, // Keep settings visible above all windows
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
-        }
+        },
+        icon: path.join(__dirname, 'icon.png'),
+        autoHideMenuBar: true
     });
 
     settingsWindow.loadFile('settings.html');
 
+    // On close, just dereference
     settingsWindow.on('closed', () => {
         settingsWindow = null;
+        if (mainWindow) {
+            mainWindow.webContents.send('settings-closed');
+            mainWindow.setSize(500, 500); // Reset to fixed size just in case
+            isSettingsOpen = false;
+        }
+    });
+
+    // Notify main window
+    if (mainWindow) {
+        mainWindow.webContents.send('settings-opened');
+    }
+}
+
+let aboutWindow = null;
+function createAboutWindow() {
+    if (aboutWindow) {
+        aboutWindow.focus();
+        return;
+    }
+
+    aboutWindow = new BrowserWindow({
+        width: 300,
+        height: 200,
+        resizable: false,
+        frame: false,
+        alwaysOnTop: true,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true
+        },
+        icon: path.join(__dirname, 'icon.png'),
+        autoHideMenuBar: true
+    });
+
+    aboutWindow.loadFile('about.html');
+
+    // Close on blur or click functionality could be added here, 
+    // but standard close behavior (Alt+F4 or creating a close button) is safer.
+    // For now, let's make it close when it loses focus to be "elegant" and unintrusive.
+    aboutWindow.on('blur', () => {
+        aboutWindow.close();
+    });
+
+    aboutWindow.on('closed', () => {
+        aboutWindow = null;
     });
 }
 
@@ -296,7 +373,8 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
-            backgroundThrottling: false
+            backgroundThrottling: false,
+            autoplayPolicy: 'no-user-gesture-required'
         }
     });
 
@@ -374,6 +452,7 @@ app.whenReady().then(() => {
 
     const contextMenu = Menu.buildFromTemplate([
         { label: 'Voice Orb AI', enabled: false },
+        { label: 'About Voice Orb', click: createAboutWindow },
         { type: 'separator' },
         { label: 'Settings...', click: createSettingsWindow },
         { type: 'separator' },
@@ -387,8 +466,15 @@ app.whenReady().then(() => {
                     const [x, y] = mainWindow.getPosition();
                     appConfig.window = { x, y };
                     saveConfig();
+
+                    // Trigger exit animation in renderer
+                    mainWindow.webContents.send('exit-app');
+
+                    // Failsafe: if renderer doesn't respond in 2s, force quit
+                    setTimeout(() => app.exit(), 2000);
+                } else {
+                    app.quit();
                 }
-                app.quit();
             }
         }
     ]);
