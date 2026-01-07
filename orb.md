@@ -25,6 +25,7 @@ npm start
 
 **Right-click** the orb to open Settings.
 
+
 ---
 
 ## Configuration
