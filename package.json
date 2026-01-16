@@ -37,6 +37,7 @@
     "groq-sdk": "^0.37.0",
     "stats.js": "^0.17.0",
     "temp": "^0.9.4",
-    "uiohook-napi": "^1.5.4"
+    "uiohook-napi": "^1.5.4",
+    "node-fetch": "^2.7.0"
   }
 }

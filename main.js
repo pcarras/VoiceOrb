@@ -378,6 +378,9 @@ function createWindow() {
         }
     });
 
+    // Force highest z-order level (screen-saver) to stay on top of everything
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+
     // Save position on move
     mainWindow.on('moved', () => {
         const pos = mainWindow.getPosition();
